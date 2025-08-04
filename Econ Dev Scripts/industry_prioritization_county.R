@@ -10,7 +10,7 @@ invisible(lapply(pkgs, library, character.only=TRUE))
 data_root  <- "/Users/jon.ekberg/Library/CloudStorage/OneDrive-SharedLibraries-RMI/US Program - Clean Regional Economic Development/ACRE"
 raw_data   <- file.path(data_root, "Data", "Raw Data")
 acre_data  <- file.path(data_root, "Data")
-output_dir <- file.path(data_root, "Outputs")
+output_dir <- file.path(Sys.getenv("HOME"), "Desktop")
 
 # CLI flags ----
 parser <- argparse::ArgumentParser()
@@ -24,7 +24,10 @@ county_fips <- args$county_fips
 region <- c(county_fips)
 
 out_csv <- if (is.null(args$out_csv)) {
-  as.character(glue::glue("{output_dir}/prioritization_matrix_{toupper(state_abbr)}_{county_fips}.csv"))
+  file.path(
+    output_dir,
+    glue::glue("prioritization_matrix_{toupper(state_abbr)}_{county_fips}.csv")
+  )
 } else {
   args$out_csv
 }
