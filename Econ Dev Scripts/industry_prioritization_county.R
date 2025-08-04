@@ -1,66 +1,36 @@
-# Libraries-----------------
-library(httr)
-library(data.table)
-library(magrittr)
-library(blsAPI)
-library(dplyr)
-library(stringr)
-library(tidyr)
-library(sf)
-library(tigris)
-library(readxl)
-library(janitor)
-library(purrr)
-library(readr)
+# Auto-install and load packages ----
+pkgs <- c("tidyverse","data.table","sf","tigris","janitor",
+          "argparse","here","glue","readr","httr","magrittr",
+          "blsAPI","jsonlite","lubridate","fuzzyjoin","readxl")
+miss <- setdiff(pkgs, installed.packages()[,1])
+if(length(miss)) install.packages(miss, repos="https://cloud.r-project.org", quiet=TRUE)
+invisible(lapply(pkgs, library, character.only=TRUE))
 
+# Centralise base paths ----
+data_root  <- "/Users/jon.ekberg/Library/CloudStorage/OneDrive-SharedLibraries-RMI/US Program - Clean Regional Economic Development/ACRE"
+raw_data   <- file.path(data_root, "Data", "Raw Data")
+acre_data  <- file.path(data_root, "Data")
+output_dir <- file.path(data_root, "Outputs")
 
-#Adjust folder locations as necessary----------------------------------
+# CLI flags ----
+parser <- argparse::ArgumentParser()
+parser$add_argument("--state_abbr", default = "IA")
+parser$add_argument("--county_fips", default = "19153")
+parser$add_argument("--out_csv", default = NULL)
+args <- parser$parse_args()
 
-setwd("C:/Users/allie.jobe/")
-raw_data<-"C:/Users/allie.jobe/RMI/US Program - Documents/6_Projects/Clean Regional Economic Development/ACRE/Data/Raw Data/"
-acre_data<-"C:/Users/allie.jobe/RMI/US Program - Documents/6_Projects/Clean Regional Economic Development/ACRE/Data"
+state_abbr <- toupper(args$state_abbr)
+county_fips <- args$county_fips
+region <- c(county_fips)
 
-
-#-------Set Region Paramater (all counties in your state)
-region<-c("35001",
-          "35003",
-          "35005",
-          "35006",
-          "35007",
-          "35009",
-          "35011",
-          "35013",
-          "35015",
-          "35017",
-          "35019",
-          "35021",
-          "35023",
-          "35025",
-          "35027",
-          "35028",
-          "35029",
-          "35031",
-          "35033",
-          "35035",
-          "35037",
-          "35039",
-          "35041",
-          "35043",
-          "35045",
-          "35047",
-          "35049",
-          "35051",
-          "35053",
-          "35055",
-          "35057",
-          "35059",
-          "35061"
-)
+out_csv <- if (is.null(args$out_csv)) {
+  as.character(glue::glue("{output_dir}/prioritization_matrix_{toupper(state_abbr)}_{county_fips}.csv"))
+} else {
+  args$out_csv
+}
 
 # ----- Set State Parameter -----
-
-state_name <- "New Mexico" #Change to desired state full name
-state_abbr <- "NM"  # Change to desired state, e.g., "SC", "TN", "NY", etc.
+state_name <- state.name[match(state_abbr, state.abb)]
 
 state_fips <- c(
   "AL"="01", "AK"="02", "AZ"="04", "AR"="05", "CA"="06", "CO"="08", "CT"="09",
@@ -75,7 +45,7 @@ state_fips <- c(
 state_area <- paste0(state_fips[state_abbr], "000")
 
 #Clean Industry NAICS codes and industry category crosswalk
-clean_industry_naics <- read.csv(paste0(raw_data,"clean_industry_naics.csv")) %>% select(-X) 
+clean_industry_naics <- read.csv(file.path(raw_data,"clean_industry_naics.csv")) %>% select(-X)
 
 #Employment - Location Quotients, Employment Change------------------------------------------
 
@@ -228,7 +198,7 @@ county_ind_emp <- county_subsectors %>%
   group_by(area_fips, clean_industry, Production.Phase) %>%
   summarise(county_ind_emp = sum(annual_avg_emplvl, na.rm = TRUE), .groups = 'drop') %>%
   left_join(county_qcew_tot, by = "area_fips") %>%
-  mutate(county_emp_perc = county_ind_emp / county_qcew_tot*100)
+  mutate(county_emp_perc = county_ind_emp / county_qcew_tot)
 
 US_ind_emp <- county_subsectors %>% 
   group_by(clean_industry, Production.Phase) %>%
@@ -236,7 +206,7 @@ US_ind_emp <- county_subsectors %>%
   filter(!is.na(unique_naics), own_code == 5) %>%
   group_by(clean_industry, Production.Phase) %>%
   summarise(US_ind_emp = sum(annual_avg_emplvl, na.rm = TRUE), .groups = 'drop') %>%
-  mutate(US_emp_perc = US_ind_emp / US_qcew_tot*100)
+  mutate(US_emp_perc = US_ind_emp / US_qcew_tot)
 
 ind_emp_combined <- left_join(county_ind_emp, US_ind_emp, by = c("clean_industry", "Production.Phase")) %>%
   mutate(consolidated_ind_lq = county_emp_perc / US_emp_perc)
@@ -283,7 +253,7 @@ county_ind_emp19 <- county_subsectors19 %>%
   group_by(area_fips, clean_industry, Production.Phase) %>%
   summarise(county_ind_emp19 = sum(annual_avg_emplvl, na.rm = TRUE), .groups = 'drop') %>%
   left_join(county_qcew_tot19, by = "area_fips") %>%
-  mutate(county_emp_perc19 = county_ind_emp19 / county_qcew_tot*100)
+  mutate(county_emp_perc19 = county_ind_emp19 / county_qcew_tot)
 
 
 US_ind_emp19 <- county_subsectors19 %>%
@@ -292,7 +262,7 @@ US_ind_emp19 <- county_subsectors19 %>%
   filter(!is.na(unique_naics), own_code == 5) %>%
   group_by(clean_industry, Production.Phase) %>%
   summarise(US_ind_emp19 = sum(annual_avg_emplvl, na.rm = TRUE), .groups = 'drop') %>%
-  mutate(US_emp_perc19 = US_ind_emp19 / US_qcew_tot19*100)
+  mutate(US_emp_perc19 = US_ind_emp19 / US_qcew_tot19)
 
 ind_emp_combined19 <- left_join(county_ind_emp19, US_ind_emp19, by = c("clean_industry", "Production.Phase")) %>%
   mutate(consolidated_ind_lq_2019 = county_emp_perc19 / US_emp_perc19) %>%
@@ -312,7 +282,7 @@ ind_emp_combined19 <- left_join(county_ind_emp19, US_ind_emp19, by = c("clean_in
 
 #Feasibility------------------------
 
-feas<-read.csv("C:/Users/allie.jobe/Downloads/cgt_county_data_08_29_2024.csv")
+feas <- read.csv(file.path(raw_data, "cgt_county_data_08_29_2024.csv"))
 
 feas_county <- feas %>%
   filter(county %in% region, aggregation_level == 4) %>%
@@ -347,9 +317,9 @@ feas_county <- feas %>%
   )
 
 #Clean investment Monitor Data---------------------------
-investment_data_path <- "C:/Users/allie.jobe/RMI/US Program - Documents/6_Projects/Clean Regional Economic Development/ACRE/Data/Raw Data/clean_investment_monitor_q1_2025/quarterly_actual_investment.csv"
-facilities_data_path <- "C:/Users/allie.jobe/RMI/US Program - Documents/6_Projects/Clean Regional Economic Development/ACRE/Data/Raw Data/clean_investment_monitor_q1_2025/manufacturing_energy_and_industry_facility_metadata.csv"
-socioeconomics_data_path <- "C:/Users/allie.jobe/RMI/US Program - Documents/6_Projects/Clean Regional Economic Development/ACRE/Data/Raw Data/clean_investment_monitor_q1_2025/socioeconomics.csv"
+investment_data_path    <- file.path(raw_data, "clean_investment_monitor_q1_2025", "quarterly_actual_investment.csv")
+facilities_data_path    <- file.path(raw_data, "clean_investment_monitor_q1_2025", "manufacturing_energy_and_industry_facility_metadata.csv")
+socioeconomics_data_path <- file.path(raw_data, "clean_investment_monitor_q1_2025", "socioeconomics.csv")
 
 
 ##county-level CIM analysis
@@ -420,7 +390,7 @@ county_useer <- read_excel(file_path,
     .groups = "drop"
   ) %>% rename(area_fips = county_fips)
 
-useer_eco <- read.csv(paste0(raw_data,"/state_useer_cat.csv"))
+useer_eco <- read.csv(file.path(raw_data,"state_useer_cat.csv"))
 useer_eco<-useer_eco %>%
   filter(clean_industry != "")
 
@@ -500,7 +470,7 @@ federal_support <- clean_industry_naics %>%
   )
 
 #State Policy Support------------------------------------
-xchange_state<-read.csv(paste0(raw_data,"xchange.csv")) %>% select(-X) %>%
+xchange_state<-read.csv(file.path(raw_data,"xchange.csv")) %>% select(-X) %>%
   filter(grepl("index",Policy),
          abbr==state_abbr) 
 
@@ -530,7 +500,7 @@ state_support <- clean_industry_naics %>%
 
 
 #Technology Readiness from IEA -----------------------------------
-iea_cleantech_sector<-read.csv(paste0(raw_data,"iea_cleantech_sector.csv"))
+iea_cleantech_sector<-read.csv(file.path(raw_data,"iea_cleantech_sector.csv"))
 
 #National Investment from CIM----------------------
 
@@ -682,68 +652,31 @@ innov_state_sum <- innov_state_long %>%
 
 #Putting the Matrix Together------------------
 
-# ── 1.  a lookup of valid industry-phase pairs ────────────────────────────────
-# Replace `naics_lookup` with the name of the data frame that holds the long
-# table you pasted (must have columns `clean_industry` and `Production.Phase`).
+ind_matrix <- supply_curves_long %>%
+  filter(area_fips %in% region) %>%
+  select(-State, -County) %>%
+  mutate(lcoe_inv = 1 - lcoe_percentile) %>%
+  left_join(ind_emp_combined19, by = c("area_fips","clean_industry","Production.Phase")) %>%
+  left_join(feas_county,       by = c("area_fips","clean_industry","Production.Phase")) %>%
+  left_join(investment_eco %>% ungroup() %>% select(-county_fips),
+            by = c("area_fips","clean_industry","Production.Phase")) %>%
+  left_join(facilities_eco %>% ungroup() %>% select(-county_fips),
+            by = c("area_fips","clean_industry","Production.Phase")) %>%
+  left_join(iea_cleantech_sector %>% select(-X), by = c("clean_industry" = "rmi_sector")) %>%
+  left_join(state_support, by = c("clean_industry","Production.Phase")) %>%
+  left_join(innov_state_sum %>% filter(statecode == state_abbr) %>% ungroup() %>% select(-statecode),
+            by = "clean_industry") %>%
+  left_join(county_useer_eco, by = c("area_fips", "clean_industry","Production.Phase")) %>%
+  left_join(federal_support, by = c("clean_industry","Production.Phase")) %>%
+  rename(density = density_county_perc)
 
-valid_pairs <- clean_industry_naics %>%                      # <-- your big table
-  distinct(clean_industry, Production.Phase)         # just the unique combos
+#Normalized Matrix & Index-----------------------------------------
+norm_vars <- c("potential","cost","inv_gdp_rank","density")
 
-# ── 2.  New-Mexico FIPS codes as a tibble ─────────────────────────────────────
-nm_fips <- tibble(
-  area_fips = c(
-    "35001","35003","35005","35006","35007","35009","35011","35013",
-    "35015","35017","35019","35021","35023","35025","35027","35028",
-    "35029","35031","35033","35035","35037","35039","35041","35043",
-    "35045","35047","35049","35051","35053","35055","35057","35059", "35061"
-  )
-) %>% 
-  mutate(area_fips = as.numeric(area_fips))           # make it numeric if needed
-
-# ── 3.  Cartesian join (FIPS × valid pairs) ───────────────────────────────────
-all_combinations <- tidyr::crossing(nm_fips, valid_pairs)
-# columns: area_fips, clean_industry, Production.Phase
-
-# ── 4.  (optional) inspect or save ────────────────────────────────────────────
-View(all_combinations)
-
-
-all_combinations<-all_combinations %>%
-  left_join(supply_curves_long%>% 
-              filter(area_fips %in% region) %>% 
-              select(-State,-County,)%>%
-              mutate(lcoe_inv = 1 - lcoe_percentile), #inverts lcoe percentile so cheaper lcoe is closer to 1, for use in calculating index
-            by=c("area_fips","clean_industry","Production.Phase"))%>%
-  left_join(ind_emp_combined19, by=c("area_fips","clean_industry","Production.Phase")) %>%
-  left_join(feas_county, by=c("area_fips","clean_industry","Production.Phase"))%>%
-  left_join(investment_eco %>% ungroup() %>% select(-county_fips), by=c("area_fips","clean_industry","Production.Phase"))%>%
-  left_join(facilities_eco %>% ungroup() %>% select(-county_fips), by=c("area_fips","clean_industry","Production.Phase")) %>%
-  left_join(iea_cleantech_sector %>%
-              select(-X),by=c("clean_industry"="rmi_sector")) %>% 
-  left_join(state_support,by=c("clean_industry","Production.Phase")) %>%
-  left_join(innov_state_sum %>%
-              filter(statecode==state_abbr) %>% ungroup()%>%
-              select(-statecode),by="clean_industry") %>%
-  left_join(county_useer_eco,by=c("area_fips", "clean_industry","Production.Phase"))%>%
-  left_join(federal_support,by=c("clean_industry","Production.Phase")) 
-  
-  
-
-
-########### The weighting needs to be fixed I believe still #############
-#Normalized Matrix & Index----------------------------------------- 
-normalized_ind_matrix <- NULL
-already_01 <- c("density_county_perc",
-                  "capacity_percentile",
-                  "lcoe_inv") ## a vector of columns that are already normalized 0 to 1 to an external national scale,
-                                      ##to avoid re-normalizing in the df
-
-normalized_ind_matrix <- all_combinations %>%
-  mutate(area_fips = as.character(area_fips))%>%
+normalized_ind_matrix <- ind_matrix %>%
+  mutate(area_fips = as.character(area_fips)) %>%
   ungroup() %>%
-  select(-county_ind_emp19, -consolidated_ind_lq_2019, -total_lcoe, -lcoe_percentile, - capacity_mw, -annual_avg_emplvl, -density) %>%
-  
-  # ── 1.  replace Inf / NA on *all* numeric columns ──────────────────────────
+  select(-county_ind_emp19, -consolidated_ind_lq_2019, -total_lcoe, -lcoe_percentile, -capacity_mw, -annual_avg_emplvl) %>%
   mutate(across(
     where(is.numeric),
     ~ case_when(
@@ -752,74 +685,62 @@ normalized_ind_matrix <- all_combinations %>%
       TRUE           ~ .
     )
   )) %>%
-  
-  # ── 2.  first 0-1 rescale, skipping the three pre-normalized cols ─────────
-  mutate(across(
-    where(is.numeric) & !any_of(already_01),
-    ~ (. - min(., na.rm = TRUE)) /
-      (max(., na.rm = TRUE) - min(., na.rm = TRUE))
-  )) %>%
-  
-  # ── 3.  row-wise composite index (density_county_perc gets 4× weight) ──────
-  rowwise() %>%                       # treat each row independently
   mutate(
-    index = {
-      # pull every numeric value *except* area_fips
-      row_vals <- c_across(where(is.numeric) & !any_of("area_fips"))
-      
-      if ("density_county_perc" %in% names(row_vals) &&
-          row_vals[["density_county_perc"]] != 0) {
-        
-        # repeat density_county_perc 4×, then average
-        other_vals <- row_vals[names(row_vals) != "density_county_perc"]
-        mean(c(other_vals, rep(row_vals[["density_county_perc"]], 4)), na.rm = TRUE)
-        
-      } else {
-        mean(row_vals, na.rm = TRUE)
-      }
-    }
-  ) %>% 
-  ungroup() %>%
-  
-  # ── 4.  final 0-1 rescale so the new index is on the same scale ───────────
+    potential    = (potential    - 1) / (50 - 1),
+    cost         = (cost         - 1) / (50 - 1),
+    inv_gdp_rank = (inv_gdp_rank - 1) / (50 - 1)
+  ) %>%
   mutate(across(
-    where(is.numeric) & !any_of(already_01),
-    ~ (. - min(., na.rm = TRUE)) /
-      (max(., na.rm = TRUE) - min(., na.rm = TRUE))
+    .cols = setdiff(names(select(., where(is.numeric))), c("potential","cost","inv_gdp_rank")),
+    ~ (. - min(., na.rm = TRUE)) / (max(., na.rm = TRUE) - min(., na.rm = TRUE))
+  )) %>%
+  mutate(density = density * 4) %>%
+  rowwise() %>%
+  mutate(index = mean(c_across(all_of(norm_vars)), na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(across(
+    where(is.numeric),
+    ~ (. - min(., na.rm = TRUE)) / (max(., na.rm = TRUE) - min(., na.rm = TRUE))
   ))
- 
 
 #Final Matrix----------------------------
-ind_matrix_final <- left_join(all_combinations %>% 
-                                mutate(area_fips = as.character(area_fips)), normalized_ind_matrix %>%
-                                select(area_fips,clean_industry,Production.Phase,index),by=c("area_fips", "clean_industry","Production.Phase")) %>%
+prioritization <- left_join(ind_matrix %>%
+                               mutate(area_fips = as.character(area_fips)),
+                             normalized_ind_matrix %>%
+                               select(area_fips,clean_industry,Production.Phase,index),
+                             by = c("area_fips", "clean_industry","Production.Phase")) %>%
   ungroup() %>%
   arrange(desc(index))
 
 #add county names-----
-  county_lookup <- counties(cb = TRUE, year = 2020) %>%
-    transmute(
-      area_fips = as.character(GEOID),  # or keep as character if leading zeroes matter
-      state_name = NAME,              # or use STUSPS for abbreviation
-      county_name = NAMELSAD
-    )
-  
-ind_matrix_final<-ind_matrix_final %>%
-  left_join(county_lookup %>% mutate(area_fips = as.character(area_fips)), by = "area_fips")%>%
-  relocate(county_name, .after = 1) %>% # Moves county_name to 2nd column
+county_lookup <- counties(cb = TRUE, year = 2020) %>%
+  transmute(
+    area_fips = as.character(GEOID),  # or keep as character if leading zeroes matter
+    state_name = NAME,              # or use STUSPS for abbreviation
+    county_name = NAMELSAD
+  )
+
+prioritization <- prioritization %>%
+  left_join(county_lookup %>% mutate(area_fips = as.character(area_fips)), by = "area_fips") %>%
+  relocate(county_name, .after = 1) %>%
   select(-state_name,-geometry)
 
 
 ## Make sure county_name and area_fips are character (for filenames)
-ind_matrix_final <- ind_matrix_final %>%
+prioritization <- prioritization %>%
   mutate(
     area_fips = as.character(area_fips),
     county_name_clean = gsub("[^A-Za-z0-9]", "_", county_name)  # remove special chars
   )
 
+# Write CSV ---------------------------------------------------------
+dir.create(dirname(out_csv), recursive = TRUE, showWarnings = FALSE)
+readr::write_csv(prioritization, out_csv, na = "")
+message("✅  CSV → ", out_csv)
+
 
 ### clean for datawrapper processing
-ind_matrix_dw <- ind_matrix_final %>%
+ind_matrix_dw <- prioritization %>%
   select(area_fips,county_name,county_name_clean, 
          clean_industry, Production.Phase,index, density, consolidated_ind_lq,
          county_ind_emp, Operating_estimated_total_facility_capex,
@@ -847,14 +768,14 @@ county_list <- group_split(ind_matrix_dw, county_name_clean, keep = TRUE)
 # Get list of names to use for files
 county_names <- group_keys(ind_matrix_dw, county_name_clean)$county_name_clean
 
-dir.create("C:/Users/allie.jobe/Documents/county_csvs", showWarnings = FALSE, recursive = TRUE)
+dir.create(file.path(output_dir, "county_csvs"), showWarnings = FALSE, recursive = TRUE)
 
 
 # Write each county to separate CSV
 walk2(
   .x = county_list,
   .y = county_names,
-  .f = ~ write_csv(.x, file = paste0("Documents/county_csvs/", .y, ".csv"))
+  .f = ~ write_csv(.x, file = file.path(output_dir, "county_csvs", paste0(.y, ".csv")))
 )
 
 
@@ -882,7 +803,7 @@ dw_test_key(api_key = "OeShPJIYxPz4CaLNYkWrjoa3riQhRMq49vG3SKm3HnS06wUltY76I9cBf
 
 # 2. USER PARAMETERS ----------------------------------------------------------
 template_id <- "BzO9a"            # Bernalillo-County chart ID
-csv_dir     <- "C:/Users/allie.jobe/Documents/county_csvs"    # folder with all NM county CSVs
+csv_dir     <- file.path(output_dir, "county_csvs")    # folder with all NM county CSVs
 out_log     <- "nm_dw_urls.csv"   # file to save county → URL lookup
 
 # 3. HELPER FUNCTION – DUPLICATE + PUBLISH -----------------------------------
@@ -966,3 +887,5 @@ print(results, n = nrow(results))
 # ──────────────────────────────────────────────────────────────────────────────
 #  End of script – embed `public_url` wherever you need the live charts!
 # ──────────────────────────────────────────────────────────────────────────────
+# Rscript "Econ Dev Scripts/industry_prioritization_county.R" \
+#         --state_abbr IA --county_fips 19153
