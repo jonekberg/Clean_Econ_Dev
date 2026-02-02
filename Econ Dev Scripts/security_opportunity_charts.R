@@ -243,7 +243,7 @@ library(stringr)
 # Keep only columns we need; standardize names; limit to target years
 res_tech <- res %>%
   left_join(subcat, by = c("cmd_code" = "code"), relationship = "many-to-many") %>%
-  rename(tech = Technology, supply_chain = `Value.Chain`) %>%
+  rename(tech = tech, supply_chain = `supply_chain`) %>%
   mutate(
     primary_value  = suppressWarnings(as.numeric(primary_value)),
     flow_direction = tolower(flow_direction),
@@ -793,7 +793,7 @@ opp_meta <- tribble(
   "trade_index",           "UN Comtrade (exports) + author","Export-side composite of last-year level and 4-5y growth, rescaled within tech × chain.", "index",
   "econ_opp_index",        "Your econ_opp_index table",      "Exporter economic opportunity (already scaled 0-1 in your pipeline).",               "index",
   "energy_security_index", "Your energy_security_index tbl", "Partner energy-security 'need' (higher = more need), scaled 0-1.",                   "index",
-  "ghg_index",             "Tech GHG lookup (tech_ghg)",     "Technology-level lifecycle GHG factor (higher = cleaner).",                          "index",
+  "ghg_index",             "Tech GHG lookup (tech_ghg)",     "tech-level lifecycle GHG factor (higher = cleaner).",                          "index",
   "climate_policy_index",  "Policy/CAT lookup (cat)",        "Partner climate-policy stringency proxy, scaled 0-1.",                               "index",
   "penalty",               "Author calculation",             "(1???GHG) × climate_policy × 0.20 applied to opportunity.",                           "composite",
   "opportunity_raw",       "Author calculation",             "Pre-penalty weighted blend: 2×trade + 2×econ_opp + 0.5×energy_security.",           "composite",
@@ -924,7 +924,7 @@ readme_tbl <- tibble(
     "",
     "Method Summary",
     "Data sources: UN Comtrade (2020-2024), econ_opp_index, energy_security_index, tech_ghg, climate policy (CAT), outbound ties.",
-    "Rescaling: median-S-curve to 0-1 within Technology × Supply Chain groups.",
+    "Rescaling: median-S-curve to 0-1 within tech × Supply Chain groups.",
     "Aggregation: country-level indices = mean of the top 3 dyads per Country×Tech×Supply Chain (prevents outliers, rewards consistency).",
     "",
     "Weighting (pre-scaling)",
@@ -940,7 +940,7 @@ readme_tbl <- tibble(
     " *_raw / *_adj: pre-scaling composites; *_index: final normalized 0-1.",
     "",
     "Intended Use",
-    "Identify priority partner countries by technology and value-chain stage; compare export competitiveness vs. friendshoring feasibility;",
+    "Identify priority partner countries by tech and value-chain stage; compare export competitiveness vs. friendshoring feasibility;",
     "support industrial strategy where economic, climate, and trade objectives align.",
     "",
     "Citation",
@@ -1131,8 +1131,8 @@ ally_iso<-c(ally_iso,"CHN")
 
 # --- Filter to allies + EV Midstream and latest year ---
 dat <- res_tech %>%
-  filter(Technology == "Solar",
-         Value.Chain == "Midstream",
+  filter(tech == "Solar",
+         supply_chain == "Midstream",
          reporter_iso %in% ally_iso,
          partner_iso  %in% ally_iso) %>%
   mutate(period_num = suppressWarnings(as.integer(period))) %>%

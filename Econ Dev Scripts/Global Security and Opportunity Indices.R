@@ -71,6 +71,9 @@ all_countries <- ei %>%
          !grepl("World|Other|Total|OECD|OPEC", Country)) %>%
   mutate(Country=recode(
     Country,
+    "US" = "United States",
+    "Korea"="South Korea",
+    "UK" = "United Kingdom",
     "Vietnam" = "Viet Nam",
     "Iran, Islamic Rep." = "Iran",
     "Turkey"          = "Turkiye",
@@ -1169,7 +1172,7 @@ ggplot(plot_df,
         strip.text = element_text(face = "bold"))
 
 #Cleantech Midstream---------------------------------------
-cleantech_man <- read.csv(paste0(raw_data, "iea_cleantech_Midstream.csv")) %>%
+cleantech_man <- read.csv(paste0(raw_data, "iea_cleantech_Manufacturing.csv")) %>%
   rename(Country = X) %>%
   mutate(Country=ifelse(Country=="US","United States",Country))
 
@@ -1308,7 +1311,7 @@ ggplot(plot_df,
 
 
 #EV Midstream - IEA EV Outlook----------------------
-ev_man<-read.csv(paste0(raw_data,"ev_Midstream_capacity.csv")) %>%
+ev_man<-read.csv(paste0(raw_data,"ev_Manufacturing_capacity.csv")) %>%
   filter(Year=="2024") %>%
   mutate(EU=ifelse(Region=="European Union",1,2)) %>%
   left_join(ei %>% distinct(Country,EU),by=c("EU")) %>%
@@ -4158,6 +4161,12 @@ development_index <- country_info %>%
               rename(energy_use_index=index),by=c("country"="Country.Name"))
 
 #Bilateral Development Assistance
+oecd_all <-read.csv("C:/Users/LCarey/Downloads/Table2a_Data/Table2a_Data.csv")
+oecd_clean <- oecd_all %>%
+  filter(Year>2011,
+         Aid.type %in% c("ODA: Total Net",
+                         "ODA as % GNI (Recipient)"))
+  
 oecd_1215<-read.csv(paste0(raw_data,"oecd_1215.csv"))
 oecd_1518<-read.csv(paste0(raw_data,"oecd_1518.csv"))
 oecd_1823<-read.csv(paste0(raw_data,"oecd_1823.csv"))
@@ -4248,19 +4257,22 @@ library(glue)
 # 1. Make bigger chunks  (e.g. 40 ISO codes at a time) --------------
 # -------------------------------------------------------------------
 iso_vec    <- eme_iso %>% pull(iso3c)
+allies_vec <- allies %>% pull(iso3c)
+
 chunk_size <- 132
 iso_chunks <- split(iso_vec, ceiling(seq_along(iso_vec) / chunk_size))
+iso_chunks_allies <- split(allies_vec, ceiling(seq_along(allies_vec) / chunk_size))
 
 # -------------------------------------------------------------------
 # 2. Helper to fetch ONE chunk  -------------------------------------
 # -------------------------------------------------------------------
-fetch_chunk <- function(recipients) {
-  
-  recips <- paste(recipients, collapse = "+")  # AFG+ALB+ARG+.
+fetch_chunk <- function(donors, recipients) {
+  recips <- paste(recipients, collapse = "+")
+  dons   <- paste(donors, collapse = "+")
   
   url <- glue(
     "https://sdmx.oecd.org/dcd-public/rest/data/",
-    "OECD.DCD.FSD,DSD_CRS@DF_CRS,1.4/USA.{recips}.",
+    "OECD.DCD.FSD,DSD_CRS@DF_CRS,1.4/{dons}.{recips}.",
     "32262+32261+322+321+230+1000.100._T._T.D.Q._T..",
     "?startPeriod=2014",
     "&dimensionAtObservation=AllDimensions",
@@ -4291,9 +4303,9 @@ fetch_chunk <- function(recipients) {
 # -------------------------------------------------------------------
 # 3. Loop over chunks, throttle between them ------------------------
 # -------------------------------------------------------------------
-all_oecd <- map_dfr(iso_chunks, function(chunk) {
-  dat <- fetch_chunk(chunk)
-  Sys.sleep(12)               # **throttle** ??? one call every 6s ??? 10/min
+all_oecd <- map_dfr(iso_chunks, function(rec_chunk) {
+  dat <- fetch_chunk(donors = allies_vec, recipients = rec_chunk)
+  Sys.sleep(12)
   dat
 }, .progress = TRUE)
 
@@ -4301,7 +4313,7 @@ all_oecd <- map_dfr(iso_chunks, function(chunk) {
 # 4. Quick checks ----------------------------------------------------
 # -------------------------------------------------------------------
 glimpse(all_oecd)                             # should now be BIGGER than 219
-unique(all_oecd$X8)[1:20]                     # first 20 recipient names
+unique(all_oecd$X6)[1:20]                     # first 20 recipient names
 
 names(all_oecd)[c(5,7,8,10,27,29)] <- c("DonorISO","RecipientISO","Recipient","Sector","Year","Value")
 all_oecd <- all_oecd %>%

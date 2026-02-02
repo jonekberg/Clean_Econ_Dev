@@ -629,7 +629,7 @@ infrastructure_index <- renpotential_state %>%
               rename(interconnection_queue=q_share),                  by = c("abbr" = "state")) %>%
   left_join(ind_price %>% select(State, price_index) %>%
               rename(electricity_price=price_index),          by = c("abbr" = "State")) %>%
-  left_join(cnbc,          by = c("geo_name" = "state")) %>%
+  left_join(cnbc %>% rename("cnbc_rank"="infrastructure"),          by = c("geo_name" = "state")) %>%
   # Clean infinities
   mutate(across(all_of(c(positive, negative)),
                 ~ replace(.x, !is.finite(.x), NA_real_))) %>%
