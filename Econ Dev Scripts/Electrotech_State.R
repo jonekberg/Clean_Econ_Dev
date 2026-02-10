@@ -397,11 +397,6 @@ gdp_ind <- gdp_ind_q %>%
          gdp_growth_10yr = X2025.Q1/X2015.Q1-1) %>%
   select(GeoName,IndustryClassification,LineCode,X2025.Q1,gdp_growth_1yr,gdp_growth_5yr,gdp_growth_10yr)
 
-gdp_manshare = gdp_ind %>%
-  select(GeoName,LineCode,X2025.Q1) %>%
-  pivot_wider(names_from="LineCode",values_from="X2025.Q1") %>%
-  mutate(man_share=`13`/)
-
 gdp_man_index <- gdp_ind %>%
   filter(IndustryClassification=="321,327-339") %>%
   left_join(gdp_manshare %>%
@@ -662,7 +657,7 @@ states_gen <- op_gen %>%
 states_rengen <- op_gen %>%
   group_by(`Plant State`,`Operating Year`,Technology) %>%
   summarize_at(vars(`Nameplate Capacity (MW)`),sum,na.rm=T) %>%
-  left_join(census_divisions,by=c("Plant State"="State.Code")) %>%filter(Status=="(OP) Operating") %>%
+  left_join(census_divisions,by=c("Plant State"="State.Code")) %>%
   filter(Technology %in% c("Conventional Hydroelectric",
                                                      "Onshore Wind Turbine",
                                                      "Batteries",
@@ -683,6 +678,11 @@ states_rengen <- op_gen %>%
   mutate(cap_index_22 = 100*cum_cap/cum_cap[Year=="2022-01-01"]) %>%
   mutate(rengrowth_22_25 = cum_cap - cum_cap[Year=="2022-01-01"]) 
 
+top_states <- states_rengen %>%
+  filter(`Operating Year`==2025) %>%
+  ungroup() %>%
+  slice_max(order_by=rengrowth_22_25,n=10) 
+
 states_rengen_total <- op_gen %>%
   group_by(`Plant State`,`Operating Year`) %>%
   filter(Status=="(OP) Operating") %>%
@@ -691,14 +691,9 @@ states_rengen_total <- op_gen %>%
   mutate(Year = make_date(`Operating Year`)) %>%
   mutate(cum_cap = cumsum(`Nameplate Capacity (MW)`)) %>%
   ungroup() %>%
-  filter(State %in% top_states$State,
+  filter(`Plant State` %in% top_states$State,
          `Operating Year`>2012) %>%
   arrange(`Operating Year`) %>%
-
-top_states <- states_rengen %>%
-  filter(`Operating Year`==2025) %>%
-  ungroup() %>%
-  slice_max(order_by=rengrowth_22_25,n=10) 
 
 rengen_chart <- states_rengen %>%
   ungroup() %>%

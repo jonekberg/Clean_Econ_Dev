@@ -19,11 +19,15 @@ gdp_ind_a <- read.csv(files[grepl("SAGDP9N__ALL_AREAS_1997_2023.csv", files)], s
 url <- "https://apps.bea.gov/regional/zip/SAGDP.zip"
 temp_zip <- tempfile(fileext = ".zip")
 download(url, temp_zip, mode = "wb")
-temp_dir <- tempdir()
+temp_dir <- paste0(getwd(),"/Downloads")
 unzip(temp_zip, exdir = temp_dir)
 files <- list.files(temp_dir, full.names = TRUE)
 
-gdp_ind_a <- read.csv(files[grepl("SAGDP9__ALL_AREAS_1997_2024.csv", files)], stringsAsFactors = FALSE)
+gdp_ind_a <- read.csv(files[grepl("SAGDP9__ALL_AREAS_1997_2024.csv", files)], stringsAsFactors = FALSE) 
+
+state_gdp <-gdp_ind_a %>%
+  filter(Description=="All industry total ") %>%
+  select(GeoFIPS,GeoName,Unit,Description,X2024)
 
 #Quarterly GDP by Industry----------------------------
 url <- "https://apps.bea.gov/regional/zip/SQGDP.zip"

@@ -1670,11 +1670,11 @@ crit_hs_filtered <- crit_hs %>%
 
 
 critmin_import <- ct_get_data(
-  reporter = country_info$iso3c,
+  reporter = allies$iso3c,
   partner = "World",
   commodity_code = crit_hs_filtered$hscode,
-  start_date = 2024,
-  end_date = 2024,
+  start_date = 2025,
+  end_date = 2025,
   flow_direction = 'import'
 )
 
